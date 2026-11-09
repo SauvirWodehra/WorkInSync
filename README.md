@@ -199,3 +199,5 @@ Opens `4_excel_output/WorkInSync_Implementation_Report.xlsx`.
 4. **Issue & Resolution Analysis** — Category breakdown, SLA breach, AM performance
 5. **Weekly Trends** — Activation trends, WoW delta, stalling detection
 
+## Live Link :- https://workinsyncc.vercel.app/
+
