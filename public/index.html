@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>WorkInSync — Implementation Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f1117;--surf:#1a1d2e;--surf2:#242740;--border:#2e3250;
+  --accent:#6366f1;--acc2:#818cf8;--green:#22c55e;--yellow:#f59e0b;
+  --red:#ef4444;--orange:#f97316;--text:#e2e8f0;--muted:#94a3b8;--r:14px
+}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* HEADER */
+.hdr{background:linear-gradient(135deg,#1a1d2e,#242740);border-bottom:1px solid var(--border);
+  padding:14px 28px;display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100}
+.hdr-l{display:flex;align-items:center;gap:12px}
+.logo{width:40px;height:40px;background:linear-gradient(135deg,var(--accent),#a855f7);
+  border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.hdr h1{font-size:1.2rem;font-weight:800}
+.hdr h1 span{color:var(--acc2)}
+.hdr-r{display:flex;align-items:center;gap:10px}
+.live{display:flex;align-items:center;gap:5px;background:rgba(34,197,94,.12);
+  border:1px solid rgba(34,197,94,.3);border-radius:20px;padding:4px 11px;font-size:.75rem;color:var(--green)}
+.dot{width:7px;height:7px;background:var(--green);border-radius:50%;animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+.ts{font-size:.72rem;color:var(--muted)}
+
+/* NAV TABS */
+.tabs{background:var(--surf);border-bottom:1px solid var(--border);
+  display:flex;gap:0;overflow-x:auto}
+.tab{padding:11px 22px;font-size:.82rem;font-weight:600;color:var(--muted);
+  cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .2s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--acc2);border-bottom-color:var(--accent);background:rgba(99,102,241,.06)}
+
+/* FILTER BAR */
+.fbar{background:var(--surf2);border-bottom:1px solid var(--border);
+  padding:10px 28px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.fl{font-size:.75rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.fbtn{padding:5px 14px;border-radius:20px;border:1px solid var(--border);
+  background:transparent;color:var(--muted);font-size:.77rem;cursor:pointer;transition:all .18s}
+.fbtn:hover,.fbtn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.fsel{padding:5px 11px;border-radius:8px;border:1px solid var(--border);
+  background:var(--surf);color:var(--text);font-size:.77rem;cursor:pointer}
+.fsel:focus{outline:none;border-color:var(--accent)}
+.fsrch{padding:5px 13px;border-radius:20px;border:1px solid var(--border);
+  background:var(--surf);color:var(--text);font-size:.77rem;width:200px}
+.fsrch:focus{outline:none;border-color:var(--accent)}
+#vcnt{font-size:.77rem;color:var(--muted);margin-left:auto}
+#vcnt strong{color:var(--acc2)}
+
+/* MAIN */
+.main{padding:24px 28px;display:flex;flex-direction:column;gap:22px}
+
+/* ALERT */
+.alert{background:linear-gradient(135deg,rgba(239,68,68,.12),rgba(249,115,22,.08));
+  border:1px solid rgba(239,68,68,.3);border-radius:var(--r);padding:13px 18px;
+  display:flex;align-items:flex-start;gap:10px}
+.alert-chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:6px}
+.chip{background:rgba(239,68,68,.18);border:1px solid rgba(239,68,68,.35);
+  border-radius:20px;padding:2px 9px;font-size:.72rem;color:#fca5a5}
+
+/* KPI GRID */
+.kgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
+.kcard{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);
+  padding:18px;position:relative;overflow:hidden;transition:transform .2s,border-color .2s}
+.kcard:hover{transform:translateY(-2px);border-color:var(--accent)}
+.kcard::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--r) var(--r) 0 0}
+.kcard.ind::before{background:linear-gradient(90deg,#6366f1,#818cf8)}
+.kcard.grn::before{background:linear-gradient(90deg,#22c55e,#4ade80)}
+.kcard.ylw::before{background:linear-gradient(90deg,#f59e0b,#fbbf24)}
+.kcard.red::before{background:linear-gradient(90deg,#ef4444,#f87171)}
+.kcard.orn::before{background:linear-gradient(90deg,#f97316,#fb923c)}
+.kcard.pur::before{background:linear-gradient(90deg,#a855f7,#c084fc)}
+.klbl{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:700}
+.kval{font-size:1.9rem;font-weight:900;margin:7px 0 3px;line-height:1}
+.ksub{font-size:.72rem;color:var(--muted)}
+.kico{position:absolute;top:16px;right:16px;font-size:1.5rem;opacity:.22}
+.ktag{display:inline-flex;align-items:center;gap:3px;font-size:.68rem;margin-top:5px;
+  padding:2px 7px;border-radius:10px}
+.ktag.up{background:rgba(34,197,94,.12);color:var(--green)}
+.ktag.dn{background:rgba(239,68,68,.12);color:var(--red)}
+.ktag.wn{background:rgba(245,158,11,.12);color:var(--yellow)}
+
+/* SECTION TITLE */
+.stitle{font-size:.95rem;font-weight:800;display:flex;align-items:center;gap:7px;margin-bottom:12px}
+.pill{font-size:.68rem;background:rgba(99,102,241,.18);color:var(--acc2);
+  border:1px solid rgba(99,102,241,.28);padding:2px 7px;border-radius:10px;font-weight:700}
+
+/* CHART GRIDS */
+.cgrid2{display:grid;grid-template-columns:2fr 1fr;gap:18px}
+.cgrid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.ccard{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);padding:20px}
+.ccard canvas{max-height:270px}
+
+/* TABLE */
+.tcard{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.thead-bar{padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.twrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.8rem}
+thead th{background:var(--surf2);padding:10px 14px;text-align:left;
+  font-size:.68rem;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);
+  font-weight:700;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer}
+thead th:hover{color:var(--acc2)}
+tbody tr{border-bottom:1px solid var(--border);transition:background .12s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:rgba(99,102,241,.05)}
+tbody td{padding:10px 14px;vertical-align:middle;white-space:nowrap}
+
+/* PROGRESS BAR */
+.pbar{width:88px}
+.pb{height:5px;border-radius:3px;background:var(--surf2);overflow:hidden}
+.pf{height:100%;border-radius:3px}
+.pl{font-size:.68rem;color:var(--muted);margin-top:2px;text-align:right}
+
+/* BADGES */
+.bdg{display:inline-block;padding:2px 9px;border-radius:20px;font-size:.7rem;font-weight:700}
+.g{background:rgba(34,197,94,.12);color:#4ade80;border:1px solid rgba(34,197,94,.22)}
+.y{background:rgba(245,158,11,.12);color:#fbbf24;border:1px solid rgba(245,158,11,.22)}
+.r{background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.22)}
+.b{background:rgba(59,130,246,.12);color:#60a5fa;border:1px solid rgba(59,130,246,.22)}
+
+/* MILESTONE CARDS */
+.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px}
+.mcard{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);padding:16px}
+.mhdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+.mname{font-weight:800;font-size:.88rem}
+.mind{font-size:.68rem;color:var(--muted)}
+.msteps{display:flex;flex-direction:column;gap:6px}
+.step{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;font-size:.76rem}
+.step.done{background:rgba(34,197,94,.08);color:var(--green)}
+.step.prog{background:rgba(99,102,241,.1);color:var(--acc2)}
+.step.pend{background:rgba(148,163,184,.05);color:var(--muted)}
+.step.fail{background:rgba(239,68,68,.08);color:#f87171}
+.sico{font-size:.95rem;flex-shrink:0}
+.sdt{font-size:.65rem;color:var(--muted);flex-shrink:0;margin-left:auto}
+
+/* LOADING */
+.loading{display:flex;align-items:center;justify-content:center;height:200px;
+  font-size:1rem;color:var(--muted)}
+.spin{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);
+  border-radius:50%;animation:spin .7s linear infinite;margin-right:12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* PAGE SECTIONS */
+.page{display:none}
+.page.active{display:block}
+
+/* HEALTH NUM */
+.hnum{font-weight:900;font-size:1rem}
+
+/* RESPONSIVE */
+@media(max-width:1050px){.cgrid2{grid-template-columns:1fr}.cgrid3{grid-template-columns:1fr 1fr}}
+@media(max-width:650px){.cgrid3{grid-template-columns:1fr}.kgrid{grid-template-columns:1fr 1fr}.main{padding:14px}}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="hdr">
+  <div class="hdr-l">
+    <div class="logo">🏢</div>
+    <div>
+      <h1>WorkIn<span>Sync</span> — Implementation Dashboard</h1>
+      <div style="font-size:.7rem;color:var(--muted);margin-top:1px">Enterprise Client Onboarding Monitor · Q4 2026 · Node.js Live Server</div>
+    </div>
+  </div>
+  <div class="hdr-r">
+    <div class="live"><div class="dot"></div>Live</div>
+    <div class="ts" id="ts"></div>
+  </div>
+</header>
+
+<!-- NAV TABS -->
+<div class="tabs">
+  <div class="tab active" onclick="showPage('overview',this)">📊 Overview</div>
+  <div class="tab" onclick="showPage('clients',this)">📋 Clients</div>
+  <div class="tab" onclick="showPage('milestones',this)">🗓️ Milestones</div>
+  <div class="tab" onclick="showPage('issues',this)">🛠️ Issues</div>
+  <div class="tab" onclick="showPage('trends',this)">📈 Trends</div>
+</div>
+
+<!-- FILTER BAR -->
+<div class="fbar">
+  <span class="fl">Filter:</span>
+  <button class="fbtn on" onclick="filterStatus('all',this)">All</button>
+  <button class="fbtn" onclick="filterStatus('On Track',this)">✅ On Track</button>
+  <button class="fbtn" onclick="filterStatus('At Risk',this)">⚠️ At Risk</button>
+  <button class="fbtn" onclick="filterStatus('Delayed',this)">🔴 Delayed</button>
+  <button class="fbtn" onclick="filterStatus('Completed',this)">🏆 Completed</button>
+  <select class="fsel" id="indFilter" onchange="applyFilters()">
+    <option value="all">All Industries</option>
+    <option>Technology</option><option>Banking</option><option>Healthcare</option>
+    <option>Manufacturing</option><option>Retail</option><option>Logistics</option>
+    <option>Pharma</option><option>FMCG</option>
+  </select>
+  <input class="fsrch" id="srch" type="text" placeholder="🔍 Search client…" oninput="applyFilters()"/>
+  <span id="vcnt">Showing <strong>20</strong> clients</span>
+</div>
+
+<!-- MAIN -->
+<main class="main">
+
+<!-- ══ PAGE: OVERVIEW ══ -->
+<div class="page active" id="page-overview">
+
+  <!-- Alert Banner -->
+  <div class="alert" id="alertBox">
+    <div style="font-size:1.2rem">🚨</div>
+    <div>
+      <div style="font-size:.82rem"><strong style="color:var(--red)">High-Risk Alert:</strong> Clients requiring immediate intervention:</div>
+      <div class="alert-chips" id="alertChips"></div>
+    </div>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="kgrid" id="kpiGrid"></div>
+
+  <!-- Charts Row 1 -->
+  <div class="cgrid2">
+    <div class="ccard">
+      <div class="stitle">📊 Setup Completion Rate by Client <span class="pill">Top 15</span></div>
+      <canvas id="chartCompletion"></canvas>
+    </div>
+    <div class="ccard">
+      <div class="stitle">🍩 Portfolio Status Distribution</div>
+      <canvas id="chartStatus"></canvas>
+    </div>
+  </div>
+
+  <!-- Charts Row 2 -->
+  <div class="cgrid3">
+    <div class="ccard">
+      <div class="stitle">⏱️ Avg Onboarding Days by Industry</div>
+      <canvas id="chartTime"></canvas>
+    </div>
+    <div class="ccard">
+      <div class="stitle">👥 Activation Rate by Client</div>
+      <canvas id="chartActivation"></canvas>
+    </div>
+    <div class="ccard">
+      <div class="stitle">🛠️ Open Issues by Category</div>
+      <canvas id="chartIssues"></canvas>
+    </div>
+  </div>
+
+  <!-- Charts Row 3 -->
+  <div class="cgrid2">
+    <div class="ccard">
+      <div class="stitle">❤️ Health Score by Client <span class="pill">Most At-Risk First</span></div>
+      <canvas id="chartHealth"></canvas>
+    </div>
+    <div class="ccard">
+      <div class="stitle">💰 Contract Value at Risk</div>
+      <canvas id="chartARR"></canvas>
+    </div>
+  </div>
+
+</div><!-- /overview -->
+
+<!-- ══ PAGE: CLIENTS ══ -->
+<div class="page" id="page-clients">
+  <div class="tcard">
+    <div class="thead-bar">
+      <div class="stitle" style="margin:0">📋 Client-wise Onboarding Tracker <span class="pill" id="tblCount">20 clients</span></div>
+      <select class="fsel" id="sortBy" onchange="renderTable()">
+        <option value="health">Sort: Health ↑ (worst first)</option>
+        <option value="completion">Sort: Completion %</option>
+        <option value="activation">Sort: Activation %</option>
+        <option value="issues">Sort: Open Issues ↓</option>
+        <option value="name">Sort: Name A-Z</option>
+      </select>
+    </div>
+    <div class="twrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>Client</th><th>Industry</th><th>Plan</th>
+            <th>Employees</th><th>Activated</th><th>Activation %</th>
+            <th>Setup %</th><th>Onboard Days</th><th>Open Issues</th>
+            <th>Status</th><th>Health</th><th>Manager</th>
+          </tr>
+        </thead>
+        <tbody id="tblBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PAGE: MILESTONES ══ -->
+<div class="page" id="page-milestones">
+  <div class="stitle">🗓️ Onboarding Milestone Tracker — All Clients</div>
+  <div class="mgrid" id="milestoneGrid"></div>
+</div>
+
+<!-- ══ PAGE: ISSUES ══ -->
+<div class="page" id="page-issues">
+  <div class="cgrid2" style="margin-bottom:20px">
+    <div class="ccard">
+      <div class="stitle">🛠️ Open Issues — Severity Breakdown</div>
+      <canvas id="chartIssueSev"></canvas>
+    </div>
+    <div class="ccard">
+      <div class="stitle">📂 Issues by Category (Open)</div>
+      <canvas id="chartIssueCat"></canvas>
+    </div>
+  </div>
+  <div class="tcard">
+    <div class="thead-bar">
+      <div class="stitle" style="margin:0">🔴 Clients with Open Issues — Severity-Weighted</div>
+    </div>
+    <div class="twrap">
+      <table>
+        <thead>
+          <tr><th>Client</th><th>Industry</th><th>Manager</th>
+            <th>Critical</th><th>Total Open</th><th>Health Score</th><th>Status</th><th>Action Required</th>
+          </tr>
+        </thead>
+        <tbody id="issueTbl"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PAGE: TRENDS ══ -->
+<div class="page" id="page-trends">
+  <div class="cgrid2" style="margin-bottom:20px">
+    <div class="ccard">
+      <div class="stitle">📈 Weekly Activation Trend — At-Risk Clients</div>
+      <canvas id="chartTrendAct"></canvas>
+    </div>
+    <div class="ccard">
+      <div class="stitle">📉 Weekly Setup Completion Trend</div>
+      <canvas id="chartTrendSetup"></canvas>
+    </div>
+  </div>
+  <div class="ccard">
+    <div class="stitle">🔄 Week-over-Week Activation Delta (All Clients — Week 8)</div>
+    <canvas id="chartWoW"></canvas>
+  </div>
+</div>
+
+</main>
+
+<footer style="border-top:1px solid var(--border);padding:12px 28px;display:flex;justify-content:space-between;font-size:.72rem;color:var(--muted)">
+  <span>WorkInSync Implementation Dashboard · Node.js Live Server · <strong style="color:var(--acc2)">Q4 2026</strong></span>
+  <span>API: /api/summary · /api/clients · /api/trends · /api/milestones · /api/issues-by-category</span>
+</footer>
+
+<script>
+// ═══════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════
+let ALL_CLIENTS = [];
+let FILTERED    = [];
+let ALL_TRENDS  = [];
+let ALL_ISSUES_CAT = [];
+let ALL_MS      = [];
+let statusFilter = 'all';
+const charts = {};
+
+// ═══════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════
+const $ = id => document.getElementById(id);
+const statusColor = s => ({Completed:'var(--green)','On Track':'var(--acc2)','At Risk':'var(--yellow)',Delayed:'var(--red)'}[s]||'var(--muted)');
+const statusBadge = s => {
+  const cls = {Completed:'g','On Track':'b','At Risk':'y',Delayed:'r'}[s]||'b';
+  return `<span class="bdg ${cls}">${s}</span>`;
+};
+const hColor = h => h>=80?'var(--green)':h>=60?'var(--yellow)':'var(--red)';
+const pBar = (pct,color) => `<div class="pbar"><div class="pb"><div class="pf" style="width:${Math.min(pct,100)}%;background:${color}"></div></div><div class="pl">${pct}%</div></div>`;
+const palette = ['#6366f1','#22c55e','#f59e0b','#ef4444','#a855f7','#06b6d4','#f97316','#ec4899','#10b981','#3b82f6','#84cc16','#8b5cf6'];
+const col = (i,a=0.85) => palette[i%palette.length]+(Math.round(a*255).toString(16).padStart(2,'0'));
+function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id]}}
+
+// ═══════════════════════════════════════════════════
+// FETCH ALL DATA
+// ═══════════════════════════════════════════════════
+async function fetchAll(){
+  try{
+    const [c,t,ic,ms] = await Promise.all([
+      fetch('/api/clients').then(r=>r.json()),
+      fetch('/api/trends').then(r=>r.json()),
+      fetch('/api/issues-by-category').then(r=>r.json()),
+      fetch('/api/milestones').then(r=>r.json()),
+    ]);
+    ALL_CLIENTS    = c;
+    ALL_TRENDS     = t;
+    ALL_ISSUES_CAT = ic;
+    ALL_MS         = ms;
+    FILTERED       = [...ALL_CLIENTS];
+    renderAll();
+    $('ts').textContent = 'Updated: '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){
+    console.error(e);
+    document.querySelector('.main').innerHTML = `<div class="loading"><div class="spin"></div>API Error: ${e.message} — Is the server running?</div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// FILTERS
+// ═══════════════════════════════════════════════════
+function filterStatus(val,btn){
+  statusFilter=val;
+  document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  applyFilters();
+}
+function applyFilters(){
+  const ind = $('indFilter').value;
+  const srch = $('srch').value.toLowerCase();
+  FILTERED = ALL_CLIENTS.filter(c=>{
+    const ms = statusFilter==='all'||c.status===statusFilter;
+    const mi = ind==='all'||c.industry===ind;
+    const mq = c.name.toLowerCase().includes(srch)||c.industry.toLowerCase().includes(srch);
+    return ms&&mi&&mq;
+  });
+  $('vcnt').innerHTML = `Showing <strong>${FILTERED.length}</strong> clients`;
+  renderAll();
+}
+
+// ═══════════════════════════════════════════════════
+// RENDER ALL
+// ═══════════════════════════════════════════════════
+function renderAll(){
+  renderAlerts();
+  renderKPIs();
+  renderCharts();
+  renderTable();
+  renderMilestones();
+  renderIssuePage();
+  renderTrends();
+}
+
+// ═══════════════════════════════════════════════════
+// ALERTS
+// ═══════════════════════════════════════════════════
+function renderAlerts(){
+  const at = ALL_CLIENTS.filter(c=>c.status==='Delayed'||(c.health<60));
+  $('alertChips').innerHTML = at.map(c=>`<span class="chip">⚠️ ${c.name} (Score: ${c.health})</span>`).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// KPI CARDS
+// ═══════════════════════════════════════════════════
+function renderKPIs(){
+  const d = FILTERED.length?FILTERED:ALL_CLIENTS;
+  const tEmp  = d.reduce((s,c)=>s+c.employees,0);
+  const tAct  = d.reduce((s,c)=>s+c.activated,0);
+  const avgS  = (d.reduce((s,c)=>s+c.setupPct,0)/d.length).toFixed(1);
+  const avgD  = (d.reduce((s,c)=>s+c.onboardDays,0)/d.length).toFixed(1);
+  const tOI   = d.reduce((s,c)=>s+c.openIssues,0);
+  const avgH  = (d.reduce((s,c)=>s+c.health,0)/d.length).toFixed(0);
+  const actPct= ((tAct/tEmp)*100).toFixed(1);
+  const atRisk= d.filter(c=>c.status==='At Risk'||c.status==='Delayed').length;
+  const kpis=[
+    {l:'Avg Completion Rate',v:avgS+'%',sub:`${d.length} clients tracked`,ico:'🎯',cls:'ind',
+     tag:avgS>=85?'up':'wn',tl:avgS>=85?'▲ Healthy portfolio':'◆ Needs attention'},
+    {l:'Avg Onboarding Time',v:avgD+'d',sub:'Target: ≤30 days',ico:'⏱️',cls:'ylw',
+     tag:avgD<=30?'up':'dn',tl:avgD<=30?'▲ Within target':'▼ Over target'},
+    {l:'Employee Activation',v:actPct+'%',sub:`${tAct.toLocaleString()} / ${tEmp.toLocaleString()} activated`,ico:'👥',cls:'grn',
+     tag:actPct>=85?'up':actPct>=70?'wn':'dn',tl:actPct>=85?'▲ Excellent':'◆ Monitor'},
+    {l:'Total Open Issues',v:tOI,sub:`${d.filter(c=>c.criticalOpenIssues>0).length} clients have critical`,ico:'🛠️',cls:'red',
+     tag:tOI===0?'up':tOI<20?'wn':'dn',tl:tOI===0?'▲ All clear':'▼ '+tOI+' open'},
+    {l:'Portfolio Health Score',v:avgH+'/100',sub:`${atRisk} client(s) at risk`,ico:'❤️',cls:'pur',
+     tag:avgH>=75?'up':avgH>=60?'wn':'dn',tl:avgH>=75?'▲ Healthy':'◆ At risk'},
+    {l:'Total ARR (Crore ₹)',v:'₹'+d.reduce((s,c)=>s+c.contractValueCr,0).toFixed(2)+' Cr',
+     sub:`₹${d.filter(c=>c.health<70).reduce((s,c)=>s+c.contractValueCr,0).toFixed(2)} Cr at risk`,ico:'💰',cls:'orn',
+     tag:'wn',tl:`◆ ${d.filter(c=>c.health<70).length} clients at risk`},
+  ];
+  $('kpiGrid').innerHTML = kpis.map(k=>`
+    <div class="kcard ${k.cls}">
+      <div class="kico">${k.ico}</div>
+      <div class="klbl">${k.l}</div>
+      <div class="kval">${k.v}</div>
+      <div class="ksub">${k.sub}</div>
+      <div class="ktag ${k.tag}">${k.tl}</div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// CHARTS
+// ═══════════════════════════════════════════════════
+const darkOpts={color:'#94a3b8',grid:{color:'#2e325040'}};
+
+function renderCharts(){
+  const d=FILTERED.length?FILTERED:ALL_CLIENTS;
+
+  // 1. Completion bar
+  const top15=[...d].sort((a,b)=>b.setupPct-a.setupPct).slice(0,15);
+  destroyChart('chartCompletion');
+  charts['chartCompletion']=new Chart($('chartCompletion'),{type:'bar',data:{
+    labels:top15.map(c=>c.name.slice(0,12)),
+    datasets:[{label:'Setup %',data:top15.map(c=>c.setupPct),borderRadius:5,
+      backgroundColor:top15.map(c=>c.setupPct>=90?'#22c55e88':c.setupPct>=70?'#f59e0b88':'#ef444488'),
+      borderColor:top15.map(c=>c.setupPct>=90?'#22c55e':c.setupPct>=70?'#f59e0b':'#ef4444'),borderWidth:1.5}]
+  },options:{responsive:true,plugins:{legend:{display:false}},
+    scales:{x:{ticks:{color:'#94a3b8',font:{size:10}},grid:{color:'#2e325020'}},
+            y:{min:0,max:100,ticks:{color:'#94a3b8',callback:v=>v+'%'},grid:{color:'#2e325040'}}}}});
+
+  // 2. Status donut
+  const sc={Completed:0,'On Track':0,'At Risk':0,Delayed:0};
+  d.forEach(c=>{sc[c.status]=(sc[c.status]||0)+1});
+  destroyChart('chartStatus');
+  charts['chartStatus']=new Chart($('chartStatus'),{type:'doughnut',data:{
+    labels:Object.keys(sc),
+    datasets:[{data:Object.values(sc),backgroundColor:['#22c55e','#6366f1','#f59e0b','#ef4444'],
+      borderWidth:2,borderColor:'#1a1d2e',hoverOffset:8}]
+  },options:{cutout:'68%',plugins:{legend:{position:'bottom',labels:{color:'#94a3b8',padding:14,font:{size:11}}}}}});
+
+  // 3. Avg time by industry (horizontal bar)
+  const inds=[...new Set(d.map(c=>c.industry))];
+  const avgTimes=inds.map(ind=>{
+    const cl=d.filter(c=>c.industry===ind);
+    return+(cl.reduce((s,c)=>s+c.onboardDays,0)/cl.length).toFixed(1);
+  });
+  destroyChart('chartTime');
+  charts['chartTime']=new Chart($('chartTime'),{type:'bar',data:{
+    labels:inds,
+    datasets:[{label:'Avg Days',data:avgTimes,
+      backgroundColor:avgTimes.map((_,i)=>col(i,.65)),borderColor:avgTimes.map((_,i)=>col(i)),
+      borderWidth:1.5,borderRadius:5}]
+  },options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false}},
+    scales:{x:{ticks:{color:'#94a3b8'},grid:{color:'#2e325040'}},
+            y:{ticks:{color:'#94a3b8',font:{size:10}},grid:{display:false}}}}});
+
+  // 4. Activation bar
+  const sortAct=[...d].sort((a,b)=>b.activationPct-a.activationPct);
+  destroyChart('chartActivation');
+  charts['chartActivation']=new Chart($('chartActivation'),{type:'bar',data:{
+    labels:sortAct.map(c=>c.name.slice(0,10)),
+    datasets:[{label:'Activation %',data:sortAct.map(c=>c.activationPct),borderRadius:4,
+      backgroundColor:sortAct.map(c=>c.activationPct>=90?'#22c55e88':c.activationPct>=75?'#f59e0b88':'#ef444488'),
+      borderColor:sortAct.map(c=>c.activationPct>=90?'#22c55e':c.activationPct>=75?'#f59e0b':'#ef4444'),borderWidth:1.5}]
+  },options:{responsive:true,plugins:{legend:{display:false}},
+    scales:{x:{ticks:{color:'#94a3b8',font:{size:9},maxRotation:45},grid:{display:false}},
+            y:{min:0,max:100,ticks:{color:'#94a3b8',callback:v=>v+'%'},grid:{color:'#2e325040'}}}}});
+
+  // 5. Issues by category (horizontal)
+  const topCats=ALL_ISSUES_CAT.slice(0,8);
+  destroyChart('chartIssues');
+  charts['chartIssues']=new Chart($('chartIssues'),{type:'bar',data:{
+    labels:topCats.map(c=>c.category.slice(0,18)),
+    datasets:[{label:'Open Issues',data:topCats.map(c=>c.total),
+      backgroundColor:'#ef444455',borderColor:'#ef4444',borderWidth:1.5,borderRadius:5}]
+  },options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false}},
+    scales:{x:{ticks:{color:'#94a3b8'},grid:{color:'#2e325040'}},
+            y:{ticks:{color:'#94a3b8',font:{size:9}},grid:{display:false}}}}});
+
+  // 6. Health score (worst first)
+  const sortH=[...d].sort((a,b)=>a.health-b.health);
+  destroyChart('chartHealth');
+  charts['chartHealth']=new Chart($('chartHealth'),{type:'bar',data:{
+    labels:sortH.map(c=>c.name.slice(0,12)),
+    datasets:[{label:'Health',data:sortH.map(c=>c.health),borderRadius:4,
+      backgroundColor:sortH.map(c=>c.health>=80?'#22c55e88':c.health>=60?'#f59e0b88':'#ef444488'),
+      borderColor:sortH.map(c=>c.health>=80?'#22c55e':c.health>=60?'#f59e0b':'#ef4444'),borderWidth:1.5}]
+  },options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` Score: ${c.raw}/100`}}},
+    scales:{x:{min:0,max:100,ticks:{color:'#94a3b8',callback:v=>v+'/100'},grid:{color:'#2e325040'}},
+            y:{ticks:{color:'#94a3b8',font:{size:9}},grid:{display:false}}}}});
+
+  // 7. ARR at risk donut
+  const safeARR=+(d.filter(c=>c.health>=70).reduce((s,c)=>s+c.contractValueCr,0)).toFixed(2);
+  const riskARR=+(d.filter(c=>c.health<70).reduce((s,c)=>s+c.contractValueCr,0)).toFixed(2);
+  destroyChart('chartARR');
+  charts['chartARR']=new Chart($('chartARR'),{type:'doughnut',data:{
+    labels:['Safe ARR (₹Cr)','At-Risk ARR (₹Cr)'],
+    datasets:[{data:[safeARR,riskARR],backgroundColor:['#22c55e88','#ef444488'],
+      borderColor:['#22c55e','#ef4444'],borderWidth:2,hoverOffset:8}]
+  },options:{cutout:'65%',plugins:{legend:{position:'bottom',labels:{color:'#94a3b8',padding:14}},
+    tooltip:{callbacks:{label:c=>` ₹${c.raw} Cr`}}}}});
+}
+
+// ═══════════════════════════════════════════════════
+// CLIENT TABLE
+// ═══════════════════════════════════════════════════
+function renderTable(){
+  const sortKey=$('sortBy').value;
+  const sorted=[...FILTERED].sort((a,b)=>{
+    if(sortKey==='health')      return a.health-b.health;
+    if(sortKey==='completion')  return b.setupPct-a.setupPct;
+    if(sortKey==='activation')  return b.activationPct-a.activationPct;
+    if(sortKey==='issues')      return b.openIssues-a.openIssues;
+    if(sortKey==='name')        return a.name.localeCompare(b.name);
+    return 0;
+  });
+  $('tblCount').textContent=sorted.length+' clients';
+  $('tblBody').innerHTML=sorted.map((c,i)=>{
+    const ac=c.activationPct>=90?'var(--green)':c.activationPct>=70?'var(--yellow)':'var(--red)';
+    const sc=c.setupPct>=90?'var(--green)':c.setupPct>=70?'var(--yellow)':'var(--red)';
+    const hc=hColor(c.health);
+    return`<tr>
+      <td style="color:var(--muted);font-weight:600">${i+1}</td>
+      <td style="font-weight:700">${c.name}</td>
+      <td><span class="bdg b">${c.industry}</span></td>
+      <td style="color:var(--muted);font-size:.72rem">${c.plan}</td>
+      <td>${c.employees.toLocaleString()}</td>
+      <td>${c.activated.toLocaleString()}</td>
+      <td>${pBar(c.activationPct,ac)}</td>
+      <td>${pBar(c.setupPct,sc)}</td>
+      <td style="color:${c.onboardDays>45?'var(--red)':'var(--green)'};font-weight:700">${c.onboardDays}d</td>
+      <td style="color:${c.openIssues>5?'var(--red)':c.openIssues>0?'var(--yellow)':'var(--green)'};font-weight:700">${c.openIssues}</td>
+      <td>${statusBadge(c.status)}</td>
+      <td><span class="hnum" style="color:${hc}">${c.health}</span>
+        <div class="pb" style="width:55px;margin-top:3px"><div class="pf" style="width:${c.health}%;background:${hc}"></div></div>
+      </td>
+      <td style="font-size:.72rem;color:var(--muted)">${c.manager}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// MILESTONES
+// ═══════════════════════════════════════════════════
+function renderMilestones(){
+  const d=FILTERED.length?FILTERED:ALL_CLIENTS;
+  const stepIcon={Completed:'✅',Failed:'❌','In Progress':'⚡',Pending:'⏳'};
+  const stepCls={Completed:'done',Failed:'fail','In Progress':'prog',Pending:'pend'};
+  $('milestoneGrid').innerHTML=d.map(c=>{
+    const ms=ALL_MS.filter(m=>m.clientId===c.id);
+    const done=ms.filter(m=>m.status==='Completed').length;
+    const pct=Math.round((done/7)*100);
+    return`<div class="mcard">
+      <div class="mhdr">
+        <div>
+          <div class="mname">${c.name}</div>
+          <div class="mind">${c.industry} · ${c.employees.toLocaleString()} employees · ${done}/7 milestones</div>
+        </div>
+        ${statusBadge(c.status)}
+      </div>
+      <div style="margin-bottom:10px">
+        <div class="pb"><div class="pf" style="width:${pct}%;background:${hColor(c.health)}"></div></div>
+        <div class="pl">${pct}% complete</div>
+      </div>
+      <div class="msteps">
+        ${ms.map(m=>`<div class="step ${stepCls[m.status]||'pend'}">
+          <span class="sico">${stepIcon[m.status]||'⏳'}</span>
+          <span style="flex:1">${m.milestone}</span>
+          ${m.delayDays>0?`<span class="sdt" style="color:var(--red)">+${m.delayDays}d delay</span>`:''}
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// ISSUES PAGE
+// ═══════════════════════════════════════════════════
+function renderIssuePage(){
+  // Severity donut
+  const sevCnt={Critical:0,High:0,Medium:0,Low:0};
+  ALL_ISSUES_CAT.forEach(i=>{sevCnt[i.sev]=(sevCnt[i.sev]||0)+i.cnt});
+  destroyChart('chartIssueSev');
+  charts['chartIssueSev']=new Chart($('chartIssueSev'),{type:'doughnut',data:{
+    labels:Object.keys(sevCnt),
+    datasets:[{data:Object.values(sevCnt),backgroundColor:['#ef4444','#f97316','#f59e0b','#22c55e'],
+      borderColor:'#1a1d2e',borderWidth:2,hoverOffset:8}]
+  },options:{cutout:'65%',plugins:{legend:{position:'bottom',labels:{color:'#94a3b8',padding:12}}}}});
+
+  // Category bar
+  destroyChart('chartIssueCat');
+  charts['chartIssueCat']=new Chart($('chartIssueCat'),{type:'bar',data:{
+    labels:ALL_ISSUES_CAT.map(c=>c.category.slice(0,16)),
+    datasets:[
+      {label:'Critical',data:ALL_ISSUES_CAT.map(c=>c.critical||0),backgroundColor:'#ef444488',borderColor:'#ef4444',borderWidth:1,borderRadius:3,stack:'s'},
+      {label:'High',    data:ALL_ISSUES_CAT.map(c=>c.high||0),    backgroundColor:'#f9731688',borderColor:'#f97316',borderWidth:1,borderRadius:3,stack:'s'},
+      {label:'Medium',  data:ALL_ISSUES_CAT.map(c=>c.medium||0),  backgroundColor:'#f59e0b88',borderColor:'#f59e0b',borderWidth:1,borderRadius:3,stack:'s'},
+      {label:'Low',     data:ALL_ISSUES_CAT.map(c=>c.low||0),     backgroundColor:'#22c55e88',borderColor:'#22c55e',borderWidth:1,borderRadius:3,stack:'s'},
+    ]
+  },options:{responsive:true,scales:{x:{ticks:{color:'#94a3b8',font:{size:9},maxRotation:30},stacked:true},
+    y:{stacked:true,ticks:{color:'#94a3b8'},grid:{color:'#2e325040'}}},
+    plugins:{legend:{labels:{color:'#94a3b8'}}}}});
+
+  // Issue table
+  const issClients=ALL_CLIENTS.filter(c=>c.openIssues>0).sort((a,b)=>b.criticalOpenIssues-a.criticalOpenIssues||(b.openIssues-a.openIssues));
+  $('issueTbl').innerHTML=issClients.map(c=>{
+    const action=c.criticalOpenIssues>0?'🔴 Escalate immediately':
+      c.openIssues>=10?'🟠 Dedicated support needed':
+      c.health<60?'🟡 Weekly review required':'📋 Standard monitoring';
+    return`<tr>
+      <td style="font-weight:700">${c.name}</td>
+      <td><span class="bdg b">${c.industry}</span></td>
+      <td style="font-size:.72rem;color:var(--muted)">${c.manager}</td>
+      <td style="color:${c.criticalOpenIssues>0?'var(--red)':'var(--muted)'};font-weight:700">${c.criticalOpenIssues}</td>
+      <td style="color:var(--yellow);font-weight:700">${c.openIssues}</td>
+      <td><span class="hnum" style="color:${hColor(c.health)}">${c.health}/100</span></td>
+      <td>${statusBadge(c.status)}</td>
+      <td style="font-size:.78rem">${action}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// TRENDS PAGE
+// ═══════════════════════════════════════════════════
+function renderTrends(){
+  // Show trends for delayed/at-risk clients only (most interesting)
+  const atRiskIds=ALL_CLIENTS.filter(c=>c.status==='Delayed'||c.status==='At Risk').map(c=>c.id);
+  const weeks=[1,2,3,4,5,6,7,8];
+
+  // Activation trend
+  destroyChart('chartTrendAct');
+  charts['chartTrendAct']=new Chart($('chartTrendAct'),{type:'line',data:{
+    labels:weeks.map(w=>'Week '+w),
+    datasets:atRiskIds.slice(0,5).map((cid,i)=>{
+      const c=ALL_CLIENTS.find(x=>x.id===cid);
+      const data=ALL_TRENDS.filter(t=>t.clientId===cid).map(t=>t.activationPct);
+      return{label:c.name.slice(0,12),data,borderColor:palette[i],
+        backgroundColor:palette[i]+'20',fill:true,tension:.35,pointRadius:3};
+    })
+  },options:{responsive:true,plugins:{legend:{labels:{color:'#94a3b8',font:{size:10}}}},
+    scales:{x:{ticks:{color:'#94a3b8'},grid:{color:'#2e325020'}},
+            y:{ticks:{color:'#94a3b8',callback:v=>v+'%'},grid:{color:'#2e325040'}}}}});
+
+  // Setup completion trend
+  destroyChart('chartTrendSetup');
+  charts['chartTrendSetup']=new Chart($('chartTrendSetup'),{type:'line',data:{
+    labels:weeks.map(w=>'Week '+w),
+    datasets:atRiskIds.slice(0,5).map((cid,i)=>{
+      const c=ALL_CLIENTS.find(x=>x.id===cid);
+      const data=ALL_TRENDS.filter(t=>t.clientId===cid).map(t=>t.setupPct);
+      return{label:c.name.slice(0,12),data,borderColor:palette[i],
+        backgroundColor:palette[i]+'18',fill:false,tension:.35,pointRadius:3,borderDash:i>2?[4,3]:[]};
+    })
+  },options:{responsive:true,plugins:{legend:{labels:{color:'#94a3b8',font:{size:10}}}},
+    scales:{x:{ticks:{color:'#94a3b8'},grid:{color:'#2e325020'}},
+            y:{ticks:{color:'#94a3b8',callback:v=>v+'%'},grid:{color:'#2e325040'}}}}});
+
+  // WoW delta bar (last week deltas for all clients)
+  const lastWeekTrends=ALL_CLIENTS.map(c=>{
+    const t=ALL_TRENDS.filter(x=>x.clientId===c.id);
+    const last=t[t.length-1];
+    return{name:c.name.slice(0,12),delta:last?last.wowDelta:0};
+  }).sort((a,b)=>b.delta-a.delta);
+  destroyChart('chartWoW');
+  charts['chartWoW']=new Chart($('chartWoW'),{type:'bar',data:{
+    labels:lastWeekTrends.map(x=>x.name),
+    datasets:[{label:'WoW Activation Δ',data:lastWeekTrends.map(x=>x.delta),borderRadius:4,
+      backgroundColor:lastWeekTrends.map(x=>x.delta>=0?'#22c55e55':'#ef444455'),
+      borderColor:lastWeekTrends.map(x=>x.delta>=0?'#22c55e':'#ef4444'),borderWidth:1.5}]
+  },options:{responsive:true,plugins:{legend:{display:false}},
+    scales:{x:{ticks:{color:'#94a3b8',font:{size:9},maxRotation:40},grid:{display:false}},
+            y:{ticks:{color:'#94a3b8'},grid:{color:'#2e325040'}}}}});
+}
+
+// ═══════════════════════════════════════════════════
+// PAGE NAVIGATION
+// ═══════════════════════════════════════════════════
+function showPage(id,tab){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  $('page-'+id).classList.add('active');
+  tab.classList.add('active');
+}
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+fetchAll();
+// Auto-refresh every 30 seconds
+setInterval(fetchAll, 30000);
+</script>
+</body>
+</html>
+
