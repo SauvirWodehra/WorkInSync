@@ -1,0 +1,27 @@
+# Node
+node_modules/
+npm-debug.log*
+.env
+
+# Temp test files
+live_dashboard/_tmp_server_test.js
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Excel output (generated — not committed)
+4_excel_output/*.xlsx
+
+# IDE
+.vscode/
+.idea/
+
